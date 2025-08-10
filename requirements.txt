@@ -1,0 +1,2 @@
+# Dependencias opcionales para desarrollo local (Databricks ya trae Spark)
+pandas>=2.2
