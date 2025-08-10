@@ -1,42 +1,57 @@
-name: databricks-smoke
+name: databricks-ci
+
 on:
   workflow_dispatch:
   push:
     branches: [dev, main]
 
 jobs:
-  smoke:
+  deploy:
     runs-on: ubuntu-latest
 
-    # ⬇️ Exporta host/token/usuario para TODOS los steps
+    # Secrets → Settings > Secrets and variables > Actions
     env:
       DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
       DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      # Opcional: por si lo usas luego, no se usa en este flujo
       DBX_USER: ${{ secrets.DBX_USER }}
+      PROJ: tu-proyecto
 
     steps:
       - uses: actions/checkout@v4
 
-      # Usa la acción oficial
-      - uses: databricks/setup-cli@main  # o fija un tag específico
+      # Instala el Databricks CLI (Action oficial)
+      - uses: databricks/setup-cli@main
 
-      # ✅ Ya autenticado por env vars; no llames 'databricks auth env'
-      - name: Who am I?
-        run: databricks current-user me
+      # Smoke básico sin cómputo
+      - name: CLI version & identity
+        run: |
+          databricks --version
+          databricks current-user me
+          databricks workspace list /
 
-      - name: List catalogs
-        run: databricks catalogs list
+      # Elegir destino según la rama
+      - name: Resolve target path
+        id: target
+        run: |
+          if [ "${{ github.ref_name }}" = "dev" ]; then
+            echo "dir=/Shared/projects/${PROJ}/dev" >> $GITHUB_OUTPUT
+          else
+            echo "dir=/Shared/projects/${PROJ}/prod" >> $GITHUB_OUTPUT
+          fi
+          echo "Target: $(cat $GITHUB_OUTPUT)"
 
-      - name: List workspace root
-        run: databricks workspace list /
+      # Crear carpetas destino (una sola vez o idempotente)
+      - name: Create target folders
+        run: |
+          databricks workspace mkdirs "${{ steps.target.outputs.dir }}/notebooks"
 
+      # Importar los notebooks del repo al Workspace
       - name: Import notebooks to Workspace
         run: |
-          TARGET_BASE="/Users/$DBX_USER/proj"
-          if [ "${{ github.ref_name }}" = "dev" ]; then
-            TARGET="$TARGET_BASE/dev"
-          else
-            TARGET="$TARGET_BASE/prod"
-          fi
-          databricks workspace mkdirs "$TARGET"
-          databricks workspace import-dir notebooks "$TARGET/notebooks" --overwrite
+          databricks workspace import-dir notebooks "${{ steps.target.outputs.dir }}/notebooks" --overwrite
+
+      # Ver lista final
+      - name: List target contents
+        run: |
+          databricks workspace list "${{ steps.target.outputs.dir }}"
