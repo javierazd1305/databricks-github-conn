@@ -5,7 +5,7 @@
 
 # COMMAND ----------
 print("Hola desde Databricks ✅")
-
+print('update: 2024-01-01')
 # COMMAND ----------
 from pyspark.sql import Row
 df = spark.createDataFrame([Row(x=1), Row(x=2), Row(x=3)])
