@@ -1,5 +1,4 @@
 name: databricks-smoke
-
 on:
   workflow_dispatch:
   push:
@@ -8,20 +7,20 @@ on:
 jobs:
   smoke:
     runs-on: ubuntu-latest
+
+    # ⬇️ Exporta host/token/usuario para TODOS los steps
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      DBX_USER: ${{ secrets.DBX_USER }}
+
     steps:
       - uses: actions/checkout@v4
 
-      # Install official Databricks CLI
-      - uses: databricks/setup-cli@main
+      # Usa la acción oficial
+      - uses: databricks/setup-cli@main  # o fija un tag específico
 
-      # Authenticate via environment (GitHub Secrets)
-      - name: Auth
-        env:
-          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
-          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
-        run: databricks auth env --host "$DATABRICKS_HOST" --token "$DATABRICKS_TOKEN"
-
-      # Non-compute smoke checks
+      # ✅ Ya autenticado por env vars; no llames 'databricks auth env'
       - name: Who am I?
         run: databricks current-user me
 
@@ -31,10 +30,7 @@ jobs:
       - name: List workspace root
         run: databricks workspace list /
 
-      # Optional: Import notebooks to Workspace path based on branch
       - name: Import notebooks to Workspace
-        env:
-          DBX_USER: ${{ secrets.DBX_USER }}
         run: |
           TARGET_BASE="/Users/$DBX_USER/proj"
           if [ "${{ github.ref_name }}" = "dev" ]; then
@@ -42,7 +38,5 @@ jobs:
           else
             TARGET="$TARGET_BASE/prod"
           fi
-          echo "Importing notebooks to: $TARGET/notebooks"
           databricks workspace mkdirs "$TARGET"
           databricks workspace import-dir notebooks "$TARGET/notebooks" --overwrite
-          databricks workspace list "$TARGET"
